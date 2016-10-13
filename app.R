@@ -27,6 +27,7 @@ getTableMetadata <- function() {
               projName = "Project Name",
               projType = "Project Type",
               perWork = "Working On",
+              projLink = "Project Link",
               projDesc = "Project Description")
   
   result <- list(fields = fields)
@@ -125,6 +126,7 @@ castData <- function(data) {
                       projName = data["projName"],
                       projType = data["projType"],
                       perWork = data["perWork"],
+                      projLink = data["projLink"],
                       projDesc = data["projDesc"],
                       stringsAsFactors = FALSE)
   # datar <- data.frame(id = data["id"],
@@ -140,7 +142,7 @@ castData <- function(data) {
 createDefaultRecord <- function() {
 #  myDefault <- castData(list(id = "0", projPriority = "0", modDate = format(Sys.time(), "%Y-%m-%d"), projName = "",
   myDefault <- castData(list(id = "0", projPriority = "0", modDate = Sys.Date(), projName = "",
-                             projType = "Productivity", perWork = "", projDesc = ""))
+                             projType = "Productivity", perWork = "", projLink = "", projDesc = ""))
   return(myDefault)
 }
 
@@ -155,6 +157,7 @@ updateInputs <- function(data, session) {
 #                    choices = c("Productivity", "Profit", "Urgent", "Miscellaneous"))
   updateTextInput(session, "perWork", value = unname(data["perWork"]))
 #                    choices = c("Andy", "Victor", "Nick", "Amit", "Colby"))
+  updateTextInput(session, "projLink", value = unname(data["projLink"]))
   updateTextAreaInput(session, "projDesc", value = unname(data["projDesc"]))
 }
 
@@ -178,6 +181,7 @@ ui <- fluidPage(
   textInput("projName", "Project Name", ""),
   selectInput("projType", "Project Type", choices = c("Productivity", "Profit", "Urgent", "Miscellaneous")),
   selectInput("perWork", "Working On", choices = c("", "Nobody", "Andy", "Victor", "Nick", "Amit", "Colby")),
+  textInput("projLink", "Project Link", ""),
   h3("Describe the Project"),
   tags$textarea(id = "projDesc", rows = 5, cols = 150),
   h3(""),
@@ -211,6 +215,10 @@ server <- function(input, output, session) {
   
   formData <- reactive({
     data <- sapply(names(getTableMetadata()$fields), function(x) input[[x]])
+    #Add hyperlink formatting
+    if(nchar(data[7]) > 1 && length(grep("href", data[7])) == 0) {
+      data[7] <- paste0("<a href='https://", data[7], "' target = '_blank'>", data[7], "</a>")
+    }
     data
   })
   
@@ -317,7 +325,10 @@ server <- function(input, output, session) {
       input$delete
       input$lowerPri
       input$raisePri
-      readData()
+      DT::datatable(readData(), options = list(order = list(list(1, 'desc'), list(2, 'desc')),
+                                               columnDefs = list(list(visible = FALSE, targets = 2))),
+                    colnames = unname(getTableMetadata()$fields)[-1],
+                    escape = c(T,T,T,T,T,T,F,T))
   #    datatable(readData()) %>% formatDate('modDate', 'toLocaleDateString')
     }
   }, server = FALSE, selection = "single",
