@@ -24,6 +24,7 @@ getTableMetadata <- function() {
   fields <- c(id = "Id",
               projPriority = "Priority",
               modDate = "Last Modified",
+              humDate = "Date Last Modified",
               projName = "Project Name",
               projType = "Project Type",
               perWork = "Working On",
@@ -62,7 +63,8 @@ readData <- function() {
 #    responses 
     allResponses <- loadData()
 #    for(i in 1:length(allResponses[[1]])) {
-#      allResponses[[1]]$modDate[i] <- as.character(as.Date(allResponses[[1]]$modDate[i], origin = "1970-01-01", format = "%Y-%m-%d"))
+#      allResponses[[1]]$modDate[i] <- as.character(as.Date(allResponses[[1]]$modDate[i],
+#    origin = "1970-01-01", format = "%Y-%m-%d"))
 #      allResponses[[1]]$modDate[i] <- i
 #    }
     responses <<- allResponses[[1]]
@@ -123,6 +125,7 @@ lowerPriData <- function(data) {
 castData <- function(data) {
   datar <- data.frame(projPriority = data["projPriority"],
                       modDate = data["modDate"],
+                      humDate = data["humDate"],
                       projName = data["projName"],
                       projType = data["projType"],
                       perWork = data["perWork"],
@@ -141,7 +144,7 @@ castData <- function(data) {
 # Return an empty, new record
 createDefaultRecord <- function() {
 #  myDefault <- castData(list(id = "0", projPriority = "0", modDate = format(Sys.time(), "%Y-%m-%d"), projName = "",
-  myDefault <- castData(list(id = "0", projPriority = "0", modDate = Sys.Date(), projName = "",
+  myDefault <- castData(list(id = "0", projPriority = "0", modDate = Sys.Date(), humDate = Sys.Date(), projName = "",
                              projType = "Productivity", perWork = "", projLink = "", projDesc = ""))
   return(myDefault)
 }
@@ -152,6 +155,7 @@ updateInputs <- function(data, session) {
   updateTextInput(session, "projPriority", value = unname(data["projPriority"]))
 #  updateDateInput(session, "modDate", value = format(Sys.time(), "%Y-%m-%d"))
   updateDateInput(session, "modDate", value = Sys.Date())
+  updateDateInput(session, "humDate", value = Sys.Date())
   updateTextInput(session, "projName", value = unname(data["projName"]))
   updateTextInput(session, "projType", value = unname(data["projType"]))
 #                    choices = c("Productivity", "Profit", "Urgent", "Miscellaneous"))
@@ -175,19 +179,29 @@ ui <- fluidPage(
 #  actionButton("change", "Change Selected Value"),
 # Back to working code
   tags$hr(),
-  shinyjs::disabled(textInput("id", "Id", "0")),
-  shinyjs::disabled(textInput("projPriority", "Priority", 0)),
-  dateInput("modDate", "Last Modified", value = NULL),
-  textInput("projName", "Project Name", ""),
-  selectInput("projType", "Project Type", choices = c("Productivity", "Profit", "Urgent", "Miscellaneous")),
-  selectInput("perWork", "Working On", choices = c("", "Nobody", "Andy", "Victor", "Nick", "Amit", "Colby")),
-  textInput("projLink", "Project Link", ""),
-  h3("Describe the Project"),
-  tags$textarea(id = "projDesc", rows = 5, cols = 150),
-  h3(""),
-  actionButton("submit", "Save Entry"),
-  actionButton("new", "Clear Entry"),
-  actionButton("delete", "Delete Record"),
+
+  fluidRow(
+    column(2,
+           shinyjs::disabled(textInput("id", "Id", "0")),
+      shinyjs::disabled(textInput("projPriority", "Priority", 0)),
+      dateInput("modDate", "Last Modified", value = NULL),
+      shinyjs::disabled(dateInput("humDate", "Date Last Modified", value = NULL))
+    ),
+    column(2,
+      textInput("projName", "Project Name", ""),
+      selectInput("projType", "Project Type", choices = c("Productivity", "Profit", "Urgent", "Miscellaneous")),
+      selectInput("perWork", "Working On", choices = c("", "Nobody", "Andy", "Victor", "Nick", "Amit", "Colby")),
+      textInput("projLink", "Project Link", "")
+    ),
+    column(8,
+      h3("Describe the Project"),
+      tags$textarea(id = "projDesc", rows = 8, cols = 150),
+      h3(""),
+      actionButton("submit", "Save Entry"),
+      actionButton("new", "Clear Entry"),
+      actionButton("delete", "Delete Record")
+    )
+  ),
 
 # Password Protect--Log In
   tags$hr(),
@@ -216,8 +230,13 @@ server <- function(input, output, session) {
   formData <- reactive({
     data <- sapply(names(getTableMetadata()$fields), function(x) input[[x]])
     #Add hyperlink formatting
-    if(nchar(data[7]) > 1 && length(grep("href", data[7])) == 0) {
-      data[7] <- paste0("<a href='https://", data[7], "' target = '_blank'>", data[7], "</a>")
+    if(nchar(data[8]) > 1 && length(grep("href", data[8])) == 0) {
+      data[8] <- paste0("<a href='https://", data[8], "' target = '_blank'>", data[8], "</a>")
+    }
+    if(data[3] > 0) {
+      data[4] <- as.character(as.Date(as.integer(data[3]), origin = "1970-01-01", format = "%Y-%m-%d"))
+    } else {
+      data[4] <- ""
     }
     data
   })
@@ -328,7 +347,9 @@ server <- function(input, output, session) {
       DT::datatable(readData(), options = list(order = list(list(1, 'desc'), list(2, 'desc')),
                                                columnDefs = list(list(visible = FALSE, targets = 2))),
                     colnames = unname(getTableMetadata()$fields)[-1],
-                    escape = c(T,T,T,T,T,T,F,T))
+                    escape = c(T,T,T,T,T,T,T,F,T)) %>% formatStyle("projType", target = "row",
+                                                                   backgroundColor =
+                                                                     styleEqual("Urgent", "darkOrange"))
   #    datatable(readData()) %>% formatDate('modDate', 'toLocaleDateString')
     }
   }, server = FALSE, selection = "single",
